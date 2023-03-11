@@ -20,6 +20,7 @@
         <Version>0.0.1</Version>
         <Copyright>Copyright (c) 2023 Pierce Andjelkovic</Copyright>
         <PackageProjectUrl>https://github.com/archanox/ppsspp-api</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/archanox/ppsspp-api</RepositoryUrl>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
