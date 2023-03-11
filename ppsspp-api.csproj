@@ -17,7 +17,7 @@
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
         <LangVersion>default</LangVersion>
-        <Version>0.0.1</Version>
+        <Version>0.0.2-pre</Version>
         <Copyright>Copyright (c) 2023 Pierce Andjelkovic</Copyright>
         <PackageProjectUrl>https://github.com/archanox/ppsspp-api</PackageProjectUrl>
         <RepositoryUrl>https://github.com/archanox/ppsspp-api</RepositoryUrl>
