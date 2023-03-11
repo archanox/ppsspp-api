@@ -30,7 +30,7 @@ public sealed class Cpu : Endpoint
 
 	public async Task AddBreakpointAsync(uint funcAddress, bool? enabled = null)
 	{
-		await _ppsspp.SendAsync<CpuBreakpointAddResult>(new ResultMessage
+		await _ppsspp.SendAsync<MessageEventArgs>(new ResultMessage
 		{
 			Event = "cpu.breakpoint.add",
 			Address = funcAddress,
@@ -40,7 +40,7 @@ public sealed class Cpu : Endpoint
 	
 	public async Task RemoveBreakpointAsync(uint funcAddress)
 	{
-		await _ppsspp.SendAsync<CpuBreakpointAddResult>(new ResultMessage
+		await _ppsspp.SendAsync<MessageEventArgs>(new ResultMessage
 		{
 			Event = "cpu.breakpoint.remove",
 			Address = funcAddress,

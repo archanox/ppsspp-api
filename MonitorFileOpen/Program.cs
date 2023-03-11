@@ -75,13 +75,4 @@ async void CpuOnStep(CpuSteppingResult cpuSteppingResult, uint address)
 		if (ex.Data.Contains("ReceivedMessage") && ex.Data["ReceivedMessage"] is JsonDocument)
 			Debug.WriteLine(((JsonDocument)ex.Data["ReceivedMessage"]!).RootElement.GetRawText());
 	}
-
-
 }
-
-
-
-
-
-
-

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -15,11 +16,18 @@ public class GameResultEventArgs : EventArgs
 	public string Version { get; set; }
 }
 
+[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public record Endpoint(
 	[property: JsonPropertyName("ip")] string IpAddress,
 	[property: JsonPropertyName("p")] int Port,
 	[property: JsonPropertyName("t")] int Time
-);
+)
+{
+    private string GetDebuggerDisplay()
+    {
+        return $"{IpAddress}:{Port} ({Time})";
+    }
+}
 
 public class ResultMessage : MessageEventArgs
 {
@@ -105,26 +113,22 @@ public class Function
 	public int Size { get; set; }
 }
 
-public class CpuBreakpointAddResult : MessageEventArgs
-{
-}
-
 public class CpuSteppingResult : MessageEventArgs
 {
 	[JsonPropertyName("pc")]
 	public int Pc { get; set; }
 	
 	[JsonPropertyName("ticks")]
-    public ulong Ticks { get; set; }
-    
-    [JsonPropertyName("reason")]
-    public string Reason { get; set; }
-    
-    [JsonPropertyName("relatedAddress")]
-    public int RelatedAddress { get; set; }
+	public ulong Ticks { get; set; }
+	
+	[JsonPropertyName("reason")]
+	public string Reason { get; set; }
+	
+	[JsonPropertyName("relatedAddress")]
+	public int RelatedAddress { get; set; }
 }
 
-public class CpuGetReg: MessageEventArgs
+public class CpuGetReg : MessageEventArgs
 {
 	[JsonPropertyName("uintValue")]
 	public uint? UIntValue { get; set; }

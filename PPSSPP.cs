@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Reactive.Linq;
+using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ppsspp_api.Endpoints;
@@ -11,7 +12,7 @@ namespace ppsspp_api;
 /// <summary>
 /// 
 /// </summary>
-public class Ppsspp : IAsyncDisposable
+public sealed class Ppsspp : IAsyncDisposable
 {
 	/// <summary>
 	/// Error levels as reported by the debugger
@@ -56,12 +57,12 @@ public class Ppsspp : IAsyncDisposable
 	/// <summary>
 	/// string indicating name of app or tool
 	/// </summary>
-	protected internal string ClientName { get; }
+	internal string ClientName { get; init; }
 
 	/// <summary>
 	/// string indicating version of app or tool
 	/// </summary>
-	protected internal string ClientVersion { get; }
+	internal string ClientVersion { get; init; }
 
 	/// <summary>
 	/// Requires a client name and version for handshake with the debugger
@@ -94,7 +95,7 @@ public class Ppsspp : IAsyncDisposable
 	private readonly Dictionary<string, EventHandler<JsonElement>> _pendingTickets = new();
 
 	private readonly string[] _noResponseEvents = { "cpu.stepping", "cpu.resume" };
-	
+
 	/// <inheritdoc cref="Game"/>
 	public readonly Game Game;
 	/// <inheritdoc cref="Cpu"/>
@@ -111,8 +112,8 @@ public class Ppsspp : IAsyncDisposable
 	/// If you have multiple, it may be the wrong one.
 	/// </summary>
 	/// <returns></returns>
-	/// <exception cref="Exception">Throws when client is unable to connect to a nearby instance</exception>
-	/// <exception cref="AlreadyConnectedException"></exception>
+	/// <exception cref="FailedConnectionException">Throws when client is unable to connect to a nearby instance</exception>
+	/// <exception cref="AlreadyConnectedException">Throws when the socket already exists</exception>
 	public async Task AutoConnectAsync()
 	{
 		if (_socket != null)
@@ -123,7 +124,7 @@ public class Ppsspp : IAsyncDisposable
 		using var client = new HttpClient();
 		await using var stream = await client.GetStreamAsync(PpssppMatchApi);
 		var listing = await JsonSerializer.DeserializeAsync<Endpoint[]>(stream);
-		
+
 		_socket = await TryNextEndpointAsync(listing);
 
 		try
@@ -132,7 +133,7 @@ public class Ppsspp : IAsyncDisposable
 		}
 		catch (Exception e)
 		{
-			throw new Exception("Couldn't connect", innerException: e);
+			throw new FailedConnectionException(_socket.Url, innerException: e);
 		}
 	}
 
@@ -142,7 +143,7 @@ public class Ppsspp : IAsyncDisposable
 	/// <param name="uri">The PPSSPP debugger endpoint</param>
 	/// <returns>A subscribed <see cref="WebsocketClient"/> with a subprotocol and listeners</returns>
 	/// <exception cref="AlreadyConnectedException">Throws when client is already connected to the debugger</exception>
-	/// <exception cref="Exception">Throws when client is unable to connect to <paramref name="uri"/></exception>
+	/// <exception cref="FailedConnectionException">Throws when client is unable to connect to <paramref name="uri"/></exception>
 	public async Task<WebsocketClient> ConnectAsync(Uri uri)
 	{
 		if (uri.Scheme != "ws")
@@ -154,7 +155,7 @@ public class Ppsspp : IAsyncDisposable
 		{
 			throw new AlreadyConnectedException();
 		}
-		
+
 		var possibleSocket = new WebsocketClient(uri, () =>
 			{
 				var clientWebSocket = new ClientWebSocket();
@@ -167,7 +168,7 @@ public class Ppsspp : IAsyncDisposable
 
 		if (!possibleSocket.IsStarted)
 		{
-			throw new Exception($"Couldn't connect to {uri}");
+			throw new FailedConnectionException(uri);
 		}
 
 		_socket = possibleSocket;
@@ -178,38 +179,34 @@ public class Ppsspp : IAsyncDisposable
 		}
 		catch (Exception e)
 		{
-			throw new Exception($"Couldn't connect to {uri}", innerException: e);
+			throw new FailedConnectionException(uri, innerException: e);
 		}
 
 		return _socket;
 	}
 
-	/// <summary>
-	/// Disconnects from PPSSPP, cleans up pending tickets and triggers the OnClose event.
-	/// </summary>
-	/// <exception cref="Exception"></exception>
-	public async Task DisconnectAsync()
+	private async Task DisconnectAsync()
 	{
 		if (_socket == null)
 		{
-			throw new Exception("Not Connected");
+			throw new NotConnectedException();
 		}
-		
+
 		FailAllPending("Disconnected from PPSSPP");
-		
+
 		await _socket.Stop(WebSocketCloseStatus.NormalClosure, "Disconnected from PPSSPP");
 		_socket.Dispose();
 		_socket = null;
-		
+
 		OnClose?.Invoke(this, EventArgs.Empty);
 	}
-	
+
 	internal Task<T> SendAsync<T>(ResultMessage data)
 		where T : MessageEventArgs, new()
 	{
 		if (_socket == null)
 		{
-			throw new Exception("Not connected");
+			throw new NotConnectedException();
 		}
 
 		if (_noResponseEvents.Contains(data.Event))
@@ -221,10 +218,10 @@ public class Ppsspp : IAsyncDisposable
 		}
 
 		var ticket = MakeTicket();
-		
+
 		var tcs = new TaskCompletionSource<T>();
-		
-		_pendingTickets[ticket] = (sender, args) =>
+
+		_pendingTickets[ticket] = (_, args) =>
 		{
 			if (args.GetProperty("event").GetString() == "error")
 			{
@@ -243,14 +240,14 @@ public class Ppsspp : IAsyncDisposable
 				tcs.SetResult(result);
 			}
 		};
-		
+
 		data.Ticket = ticket;
-		
+
 		_socket.Send(JsonSerializer.Serialize(data, new JsonSerializerOptions
 		{
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
 		}));
-		
+
 
 		return tcs.Task;
 	}
@@ -260,7 +257,7 @@ public class Ppsspp : IAsyncDisposable
 		websocketClient?.DisconnectionHappened.Subscribe(info =>
 			{
 				OnClose?.Invoke(this, EventArgs.Empty);
-				
+
 				FailAllPending($"PPSSPP disconnected {info.Exception?.Message}");
 			}
 		);
@@ -333,10 +330,7 @@ public class Ppsspp : IAsyncDisposable
 				catch (Exception ex)
 				{
 					await HandleErrorAsync($"Failed to parse message from PPSSPP: {ex.Message}", ErrorLevels.Error);
-					
-					//if(ex.Data != null && ex.Data.Contains("ReceivedMessage") && ex.Data["ReceivedMessage"] is JsonDocument)
-                    //		Debug.WriteLine(((JsonDocument)ex.Data["ReceivedMessage"]).RootElement.GetRawText());
-					
+
 					Debug.WriteLine(root.GetRawText());
 					throw;
 				}
@@ -352,7 +346,7 @@ public class Ppsspp : IAsyncDisposable
 			var endpoints = listing as Endpoint[] ?? listing?.ToArray();
 			if (endpoints == null || !endpoints.Any())
 			{
-				throw new Exception("Couldn't connect automatically. Is PPSSPP connected to the same network?");
+				throw new NoEndpointsException();
 			}
 
 			var ipAddress = endpoints.First().IpAddress;
@@ -406,7 +400,7 @@ public class Ppsspp : IAsyncDisposable
 	{
 		const string chars = "0123456789abcdefghijklmnopqrstuvwxyz";
 		var random = new Random();
-		
+
 		while (true)
 		{
 			var ticket = new string(Enumerable.Repeat(chars, 11)
@@ -425,12 +419,12 @@ public class Ppsspp : IAsyncDisposable
 	private void FailAllPending(string message)
 	{
 		var data = new ResultMessage { Event = "error", Message = message, Level = ErrorLevels.Error };
-		
+
 		foreach (var pendingTicket in _pendingTickets.ToArray())
 		{
 			_pendingTickets[pendingTicket.Key].Invoke(this, JsonSerializer.SerializeToElement(data));
 		}
-		
+
 		_pendingTickets.Clear();
 	}
 
@@ -448,12 +442,97 @@ public class Ppsspp : IAsyncDisposable
 	}
 }
 
+/// <summary>
+/// 
+/// </summary>
+[Serializable]
+public class FailedConnectionException : Exception
+{
+
+	public FailedConnectionException() : base()
+	{
+	}
+
+	public FailedConnectionException(string? message) : base(message)
+	{
+	}
+
+	public FailedConnectionException(Uri url) : base($"Couldn't connect to {url}")
+	{
+	}
+
+	public FailedConnectionException(Uri url, Exception? innerException) : base($"Couldn't connect to {url}", innerException)
+	{
+	}
+
+	public FailedConnectionException(string? message, Exception? innerException) : base(message, innerException)
+	{
+	}
+
+	protected FailedConnectionException(SerializationInfo info, StreamingContext context) : base(info, context)
+	{
+	}
+}
+
+/// <summary>
+/// 
+/// </summary>
+[Serializable]
+public class NotConnectedException : Exception
+{
+	public NotConnectedException() : base("Not connected")
+	{
+	}
+
+	public NotConnectedException(string? message) : base(message)
+	{
+	}
+
+	public NotConnectedException(string? message, Exception? innerException) : base(message, innerException)
+	{
+	}
+
+	protected NotConnectedException(SerializationInfo info, StreamingContext context) : base(info, context)
+	{
+	}
+}
+
+/// <summary>
+/// 
+/// </summary>
+[Serializable]
+public class NoEndpointsException : Exception
+{
+	public NoEndpointsException() : base("Couldn't connect automatically. Is PPSSPP connected to the same network?")
+	{
+	}
+
+	public NoEndpointsException(string? message) : base(message)
+	{
+	}
+
+	public NoEndpointsException(string? message, Exception? innerException) : base(message, innerException)
+	{
+	}
+
+	protected NoEndpointsException(SerializationInfo info, StreamingContext context) : base(info, context)
+	{
+	}
+}
+
+/// <summary>
+/// 
+/// </summary>
+[Serializable]
 public class AlreadyConnectedException : Exception
 {
 	/// <inheritdoc cref="AlreadyConnectedException"/>
-	public AlreadyConnectedException()
+	public AlreadyConnectedException() : base("Already connected, disconnect first")
 	{
-		throw new Exception("Already connected, disconnect first");
+	}
+
+	protected AlreadyConnectedException(SerializationInfo serializationInfo, StreamingContext streamingContext) : base(serializationInfo, streamingContext)
+	{
 	}
 }
 
