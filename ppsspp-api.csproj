@@ -21,6 +21,10 @@
         <Copyright>Copyright (c) 2023 Pierce Andjelkovic</Copyright>
         <PackageProjectUrl>https://github.com/archanox/ppsspp-api</PackageProjectUrl>
         <RepositoryUrl>https://github.com/archanox/ppsspp-api</RepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Description>C# library for interfacing with the PPSSPP Debugger API</Description>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>PPSSPP</PackageTags>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -50,11 +54,24 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.5.0" />
+      <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.5.22">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="SonarAnalyzer.CSharp" Version="8.54.0.64047">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
       <PackageReference Include="Websocket.Client" Version="4.6.1" />
     </ItemGroup>
 
     <ItemGroup>
       <None Update="PPSSPP-01.png">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+      <None Update="README.md">
         <Pack>True</Pack>
         <PackagePath>\</PackagePath>
       </None>

@@ -2,9 +2,9 @@ namespace ppsspp_api.Endpoints;
 
 public abstract class Endpoint
 {
-	protected readonly PPSSPP _ppsspp;
+	protected readonly Ppsspp _ppsspp;
 
-	internal Endpoint(PPSSPP ppsspp)
+	private protected Endpoint(Ppsspp ppsspp)
 	{
 		_ppsspp = ppsspp;
 	}

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace ppsspp_api;
 
-public class GameResultArgs : EventArgs
+public class GameResultEventArgs : EventArgs
 {
 	[JsonPropertyName("title")]
 	public string Title { get; set; }
@@ -21,7 +21,7 @@ public record Endpoint(
 	[property: JsonPropertyName("t")] int Time
 );
 
-public class ResultMessage : IMessage
+public class ResultMessage : MessageEventArgs
 {
 	[JsonPropertyName("name")]
 	public string Name { get; set; }
@@ -29,8 +29,8 @@ public class ResultMessage : IMessage
 	[JsonPropertyName("version")]
 	public string Version { get; set; }
 	
-	[property: JsonPropertyName("level")]
-	public PPSSPP.ErrorLevels Level { get; set; }
+	[JsonPropertyName("level")]
+	public Ppsspp.ErrorLevels Level { get; set; }
 
 	[JsonPropertyName("address")]
 	public uint? Address { get; set; }
@@ -45,7 +45,7 @@ public class ResultMessage : IMessage
 	public bool? Enabled { get; set; }
 }
 
-public class IMessage : EventArgs
+public class MessageEventArgs : EventArgs
 {
 	[JsonPropertyName("event")]
 	public string Event { get; set; }
@@ -60,7 +60,7 @@ public class IMessage : EventArgs
 	public JsonElement Data { get; set; }
 }
 
-public class MemoryReadResult : IMessage
+public class MemoryReadResult : MessageEventArgs
 {
 	[JsonPropertyName("base64")]
 	public string Base64 { get; set; }
@@ -69,16 +69,16 @@ public class MemoryReadResult : IMessage
 	public byte[] ByteArray => Convert.FromBase64String(Base64);
 }
 
-public class GameStatusResult : IMessage
+public class GameStatusResult : MessageEventArgs
 {
 	[JsonPropertyName("game")]
-	public GameResultArgs? Game { get; set; }
+	public GameResultEventArgs? Game { get; set; }
 	
 	[JsonPropertyName("paused")]
 	public bool Paused { get; set; }
 }
 
-public class VersionResult : IMessage
+public class VersionResult : MessageEventArgs
 {
 	[JsonPropertyName("name")]
 	public string Name { get; set; }
@@ -87,7 +87,7 @@ public class VersionResult : IMessage
 	public string Version { get; set; }
 }
 
-public class HleFuncListResult : IMessage
+public class HleFuncListResult : MessageEventArgs
 {
 	[JsonPropertyName("functions")]
 	public Function[] Functions { get; set; }
@@ -105,11 +105,11 @@ public class Function
 	public int Size { get; set; }
 }
 
-public class CpuBreakpointAddResult : IMessage
+public class CpuBreakpointAddResult : MessageEventArgs
 {
 }
 
-public class CpuSteppingResult : IMessage
+public class CpuSteppingResult : MessageEventArgs
 {
 	[JsonPropertyName("pc")]
 	public int Pc { get; set; }
@@ -124,7 +124,7 @@ public class CpuSteppingResult : IMessage
     public int RelatedAddress { get; set; }
 }
 
-public class CpuGetReg: IMessage
+public class CpuGetReg: MessageEventArgs
 {
 	[JsonPropertyName("uintValue")]
 	public uint? UIntValue { get; set; }
@@ -139,17 +139,17 @@ public class CpuGetReg: IMessage
 	public string FloatValue { get; set; }
 }
 
-public class MemoryReadStringResult: IMessage
+public class MemoryReadStringResult : MessageEventArgs
 {
 	[JsonPropertyName("value")]
 	public string Value { get; set; }
 }
 
-public class CpuResumeResult: IMessage
+public class CpuResumeResult : MessageEventArgs
 {
 }
 
-public class InputAnalogResult : IMessage
+public class InputAnalogResult : MessageEventArgs
 {
 	[JsonPropertyName("stick")]
 	public string Stick { get; set; }
@@ -162,13 +162,13 @@ public class InputAnalogResult : IMessage
 }
 
 
-public class InputButtonResult : IMessage
+public class InputButtonResult : MessageEventArgs
 {
 	[JsonPropertyName("buttons")]
 	public Buttons Buttons { get; set; }
 	
 	[JsonPropertyName("changed")]
-	public Buttons Changed { get; set; }
+	public Buttons? Changed { get; set; }
 }
 
 public class Buttons

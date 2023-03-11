@@ -7,30 +7,30 @@ public sealed class Cpu : Endpoint
 	public event EventHandler<CpuSteppingResult>? OnStep;
 	public event EventHandler<CpuResumeResult>? OnResume;
 
-	internal Cpu(PPSSPP ppsspp) : base(ppsspp)
+	internal Cpu(Ppsspp ppsspp) : base(ppsspp)
 	{
 	}
 
-	public async ValueTask<CpuResumeResult> Resume()
+	public async ValueTask<CpuResumeResult> ResumeAsync()
 	{
-		return await _ppsspp.Send<CpuResumeResult>(new ResultMessage
+		return await _ppsspp.SendAsync<CpuResumeResult>(new ResultMessage
 		{
 			Event = "cpu.resume",
 		});
 	}
 	
-	public async ValueTask<CpuGetReg> GetRegister(string register)
+	public async ValueTask<CpuGetReg> GetRegisterAsync(string register)
 	{
-		return await _ppsspp.Send<CpuGetReg>(new ResultMessage
+		return await _ppsspp.SendAsync<CpuGetReg>(new ResultMessage
 		{
 			Event = "cpu.getReg",
 			Name = register,
 		});
 	}
 
-	public async Task AddBreakpoint(uint funcAddress, bool? enabled = null)
+	public async Task AddBreakpointAsync(uint funcAddress, bool? enabled = null)
 	{
-		await _ppsspp.Send<CpuBreakpointAddResult>(new ResultMessage
+		await _ppsspp.SendAsync<CpuBreakpointAddResult>(new ResultMessage
 		{
 			Event = "cpu.breakpoint.add",
 			Address = funcAddress,
@@ -38,9 +38,9 @@ public sealed class Cpu : Endpoint
 		});
 	}
 	
-	public async Task RemoveBreakpoint(uint funcAddress)
+	public async Task RemoveBreakpointAsync(uint funcAddress)
 	{
-		await _ppsspp.Send<CpuBreakpointAddResult>(new ResultMessage
+		await _ppsspp.SendAsync<CpuBreakpointAddResult>(new ResultMessage
 		{
 			Event = "cpu.breakpoint.remove",
 			Address = funcAddress,

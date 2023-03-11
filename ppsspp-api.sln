@@ -1,12 +1,17 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ppsspp-api", "ppsspp-api.csproj", "{33379579-44D3-42BD-8127-BE91D70E0E01}"
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33424.131
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ppsspp-api", "ppsspp-api.csproj", "{33379579-44D3-42BD-8127-BE91D70E0E01}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld", "HelloWorld\HelloWorld.csproj", "{C2ABC369-9C8D-4DB2-B784-0331B5250562}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HelloWorld", "HelloWorld\HelloWorld.csproj", "{C2ABC369-9C8D-4DB2-B784-0331B5250562}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonitorFileOpen", "MonitorFileOpen\MonitorFileOpen.csproj", "{4571430D-696C-490F-9F3C-2DF76667EE0F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MonitorFileOpen", "MonitorFileOpen\MonitorFileOpen.csproj", "{4571430D-696C-490F-9F3C-2DF76667EE0F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Memory", "Memory\Memory.csproj", "{6DF1B378-A613-43AF-A721-BE27BDC7F02E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Memory", "Memory\Memory.csproj", "{6DF1B378-A613-43AF-A721-BE27BDC7F02E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{64E4D443-6C14-4B2D-9038-CCF6566F64F0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -30,5 +35,16 @@ Global
 		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C2ABC369-9C8D-4DB2-B784-0331B5250562} = {64E4D443-6C14-4B2D-9038-CCF6566F64F0}
+		{4571430D-696C-490F-9F3C-2DF76667EE0F} = {64E4D443-6C14-4B2D-9038-CCF6566F64F0}
+		{6DF1B378-A613-43AF-A721-BE27BDC7F02E} = {64E4D443-6C14-4B2D-9038-CCF6566F64F0}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F3E9B155-3651-45C8-91CE-7223FBA8BF58}
 	EndGlobalSection
 EndGlobal

@@ -4,7 +4,7 @@ namespace ppsspp_api.Endpoints;
 
 public sealed class Input : Endpoint
 {
-	internal Input(PPSSPP ppsspp) : base(ppsspp)
+	internal Input(Ppsspp ppsspp) : base(ppsspp)
 	{
 	}
 

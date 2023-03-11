@@ -1,18 +1,18 @@
 ﻿using System.Diagnostics;
 using ppsspp_api;
 
-var ppsspp = new PPSSPP("ppsspp-api-samples", "1.0.0");
+await using var ppsspp = new Ppsspp("ppsspp-api-samples", "1.0.0");
 
 try
 {
-	//await ppsspp.AutoConnect();
-	ppsspp.Connect(new Uri("ws://127.0.0.1:45333/debugger"));
+	// await ppsspp.AutoConnectAsync();
+	await ppsspp.ConnectAsync(new Uri("ws://127.0.0.1:45333/debugger"));
 
-	var result = await ppsspp.Game.Version();
+	var result = await ppsspp.Game.VersionAsync();
 
 	Console.WriteLine($"Connected to {result.Name} version {result.Version}");
 
-	var gameResult = await ppsspp.Game.Status();
+	var gameResult = await ppsspp.Game.StatusAsync();
 
 	if (gameResult.Game == null)
 	{
@@ -26,8 +26,4 @@ catch (Exception error)
 {
 	await Console.Error.WriteLineAsync($"Something went wrong: {error.Message}");
 	Debug.WriteLine(error.Data["ReceivedMessage"]);
-}
-finally
-{
-	ppsspp.Disconnect();
 }

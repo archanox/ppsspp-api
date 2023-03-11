@@ -2,20 +2,20 @@
 using System.Text.Json;
 using ppsspp_api;
 
-var ppsspp = new PPSSPP("ppsspp-api-samples", "1.0.0");
+await using var ppsspp = new Ppsspp("ppsspp-api-samples", "1.0.0");
 
 uint? functionAddress = null;
 
 try
 {
-	//await ppsspp.AutoConnect();
-	ppsspp.Connect(new Uri("ws://192.168.1.8:45333/debugger"));
+	//await ppsspp.AutoConnectAsync();
+	await ppsspp.ConnectAsync(new Uri("ws://192.168.1.8:45333/debugger"));
 
-	var result = await ppsspp.Game.Version();
+	var result = await ppsspp.Game.VersionAsync();
 
 	Console.WriteLine($"Connected to {result.Name} version {result.Version}");
 
-	var result2 = await ppsspp.Hle.FunctionList();
+	var result2 = await ppsspp.Hle.FunctionListAsync();
 	
 	if (!result2.Functions.Any())
 	{
@@ -33,7 +33,7 @@ try
 
 	ppsspp.Cpu.OnStep += (_, cpuSteppingResult) => CpuOnStep(cpuSteppingResult, functionAddress.Value);
 	
-	await ppsspp.Cpu.AddBreakpoint(functionAddress.Value);
+	await ppsspp.Cpu.AddBreakpointAsync(functionAddress.Value);
 	
 	await Task.Delay(-1);
 }
@@ -42,14 +42,12 @@ catch (Exception ex)
 	await Console.Error.WriteLineAsync($"Something went wrong: {ex.Message}");
 	
 	if(ex.Data.Contains("ReceivedMessage") && ex.Data["ReceivedMessage"] is JsonDocument)
-		Debug.WriteLine(((JsonDocument)ex.Data["ReceivedMessage"]).RootElement.GetRawText());
+		Debug.WriteLine(((JsonDocument)ex.Data["ReceivedMessage"]!).RootElement.GetRawText());
 }
 finally
 {
 	if(functionAddress.HasValue)
-		await ppsspp.Cpu.RemoveBreakpoint(functionAddress.Value);
-	
-	ppsspp.Disconnect();
+		await ppsspp.Cpu.RemoveBreakpointAsync(functionAddress.Value);
 }
 
 async void CpuOnStep(CpuSteppingResult cpuSteppingResult, uint address)
@@ -59,23 +57,26 @@ async void CpuOnStep(CpuSteppingResult cpuSteppingResult, uint address)
 		return;
 	}
 
-	var cpuGetRegResult = await ppsspp.Cpu.GetRegister("a0");
+	var cpuGetRegResult = await ppsspp.Cpu.GetRegisterAsync("a0");
 
-	var stringResult = await ppsspp.Memory.ReadString(cpuGetRegResult.UIntValue.Value);
+	if (cpuGetRegResult.UIntValue == null) return;
 
+	var stringResult = await ppsspp.Memory.ReadStringAsync(cpuGetRegResult.UIntValue.Value);
 	try
 	{
 		Console.WriteLine($"Opening {stringResult.Value}...");
-		var resumeResult = await ppsspp.Cpu.Resume();
+		var resumeResult = await ppsspp.Cpu.ResumeAsync();
 		Console.WriteLine(resumeResult.Data.GetRawText());
 	}
 	catch (Exception ex)
 	{
 		Console.Error.WriteLine($"Failed to log open? {ex.Message}");
-		
-		if(ex.Data.Contains("ReceivedMessage") && ex.Data["ReceivedMessage"] is JsonDocument)
-			Debug.WriteLine(((JsonDocument)ex.Data["ReceivedMessage"]).RootElement.GetRawText());
+
+		if (ex.Data.Contains("ReceivedMessage") && ex.Data["ReceivedMessage"] is JsonDocument)
+			Debug.WriteLine(((JsonDocument)ex.Data["ReceivedMessage"]!).RootElement.GetRawText());
 	}
+
+
 }
 
 
