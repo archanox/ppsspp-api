@@ -19,10 +19,16 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: 7.0.x
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
+    - name: publish nuget package
+      uses: dansiegel/publish-nuget@v1.2
+      with:
+        filename: '*.nupkg'
+        apiKey: ${{secrets.GITHUB_TOKEN}}
+        feedUrl: https://nuget.pkg.github.com/${{github.repository_owner}}/index.json
