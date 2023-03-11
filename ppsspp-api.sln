@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ppsspp-api", "ppsspp-api.csproj", "{33379579-44D3-42BD-8127-BE91D70E0E01}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld", "HelloWorld\HelloWorld.csproj", "{C2ABC369-9C8D-4DB2-B784-0331B5250562}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonitorFileOpen", "MonitorFileOpen\MonitorFileOpen.csproj", "{4571430D-696C-490F-9F3C-2DF76667EE0F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Memory", "Memory\Memory.csproj", "{6DF1B378-A613-43AF-A721-BE27BDC7F02E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{33379579-44D3-42BD-8127-BE91D70E0E01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33379579-44D3-42BD-8127-BE91D70E0E01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33379579-44D3-42BD-8127-BE91D70E0E01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33379579-44D3-42BD-8127-BE91D70E0E01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2ABC369-9C8D-4DB2-B784-0331B5250562}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2ABC369-9C8D-4DB2-B784-0331B5250562}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2ABC369-9C8D-4DB2-B784-0331B5250562}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2ABC369-9C8D-4DB2-B784-0331B5250562}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4571430D-696C-490F-9F3C-2DF76667EE0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4571430D-696C-490F-9F3C-2DF76667EE0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4571430D-696C-490F-9F3C-2DF76667EE0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4571430D-696C-490F-9F3C-2DF76667EE0F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DF1B378-A613-43AF-A721-BE27BDC7F02E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,58 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <RootNamespace>ppsspp_api</RootNamespace>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+        <SignAssembly>False</SignAssembly>
+        <Title>PPSSPP Debugger API</Title>
+        <Authors>Pierce Andjelkovic</Authors>
+        <PackageIcon>PPSSPP-01.png</PackageIcon>
+        <NeutralLanguage>en-AU</NeutralLanguage>
+        <PackageLicenseExpression>ISC</PackageLicenseExpression>
+        <IncludeSymbols>True</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+      <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+      <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Compile Remove="HelloWorld\**" />
+      <Compile Remove="MonitorFileOpen\**" />
+      <Compile Remove="Memory\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="HelloWorld\**" />
+      <EmbeddedResource Remove="MonitorFileOpen\**" />
+      <EmbeddedResource Remove="Memory\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="HelloWorld\**" />
+      <None Remove="MonitorFileOpen\**" />
+      <None Remove="Memory\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Websocket.Client" Version="4.6.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="PPSSPP-01.png">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+    </ItemGroup>
+
+</Project>
