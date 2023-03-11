@@ -26,9 +26,7 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
-    - name: publish nuget package
-      uses: dansiegel/publish-nuget@v1.2
-      with:
-        filename: '*.nupkg'
-        apiKey: ${{secrets.GITHUB_TOKEN}}
-        feedUrl: https://nuget.pkg.github.com/${{github.repository_owner}}/index.json
+    - name: Publish
+      run: dotnet nuget add source --username ${{github.repository_owner}} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/${{github.repository_owner}}/index.json"
+       | dotnet pack --configuration Release
+       | dotnet nuget push "bin/Release/ppsspp-api.0.0.1.nupkg" --api-key ${{secrets.GITHUB_TOKEN}} --source "github"
