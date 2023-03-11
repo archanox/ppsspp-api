@@ -34,4 +34,4 @@ jobs:
     - name: Pack
       run: dotnet pack ppsspp-api.csproj --configuration Release -p:Version=${{github.ref_name}} --no-restore --no-build
     - name: Publish
-      run: dotnet nuget push **/*.nupkg --api-key ${{secrets.YOUR_GITHUB_PAT}} --source "github" --skip-duplicate
+      run: dotnet nuget push bin/Release/*.nupkg --api-key ${{secrets.YOUR_GITHUB_PAT}} --source "github" --skip-duplicate
