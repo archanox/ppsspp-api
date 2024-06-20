@@ -15,7 +15,7 @@ public sealed class Game : Endpoint
 	///     - title: string game title.
 	///  - paused: boolean, true when gameplay is paused (not the same as stepping.)
 	/// </summary>
-	public event EventHandler<GameResultEventArgs>? OnStarted;
+	public AsyncEvent<GameResultEventArgs> OnStarted = new ();
 
 	/// <summary>
 	/// - game: null or an object with properties:
@@ -24,7 +24,7 @@ public sealed class Game : Endpoint
 	///     - title: string game title.
 	///  - paused: boolean, true when gameplay is paused (not the same as stepping.)
 	/// </summary>
-	public event EventHandler<GameResultEventArgs>? OnQuit;
+	public AsyncEvent<GameResultEventArgs> OnQuit = new ();
 
 	/// <summary>
 	/// Game paused (game.pause)
@@ -37,7 +37,7 @@ public sealed class Game : Endpoint
 	///     - version: string disc version.
 	///     - title: string game title.
 	/// </summary>
-	public event EventHandler<GameResultEventArgs>? OnPaused;
+	public AsyncEvent<GameResultEventArgs> OnPaused = new();
 
 	/// <summary>
 	/// Game resumed (game.pause)
@@ -50,7 +50,7 @@ public sealed class Game : Endpoint
 	///     - version: string disc version.
 	///     - title: string game title.
 	/// </summary>
-	public event EventHandler<GameResultEventArgs>? OnResumed;
+	public AsyncEvent<GameResultEventArgs> OnResumed = new();
 
 	/// <summary>
 	/// Reset emulation (game.reset)
@@ -97,25 +97,5 @@ public sealed class Game : Endpoint
 			Name = _ppsspp.ClientName,
 			Version = _ppsspp.ClientVersion,
 		});
-	}
-
-	internal void Started(JsonElement root)
-	{
-		OnStarted?.Invoke(this, root.Deserialize<GameResultEventArgs>() ?? new GameResultEventArgs());
-	}
-
-	internal void Quit(JsonElement root)
-	{
-		OnQuit?.Invoke(this, root.Deserialize<GameResultEventArgs>() ?? new GameResultEventArgs());
-	}
-
-	internal void Paused(JsonElement root)
-	{
-		OnPaused?.Invoke(this, root.Deserialize<GameResultEventArgs>() ?? new GameResultEventArgs());
-	}
-
-	internal void Resumed(JsonElement root)
-	{
-		OnResumed?.Invoke(this, root.Deserialize<GameResultEventArgs>() ?? new GameResultEventArgs());
 	}
 }
