@@ -1,11 +1,12 @@
 using System.Text.Json;
+using Microsoft.Win32;
 
 namespace ppsspp_api.Endpoints;
 
 public sealed class Cpu : Endpoint
 {
-	public event EventHandler<CpuSteppingResult>? OnStep;
-	public event EventHandler<CpuResumeResult>? OnResume;
+	public AsyncEvent<CpuSteppingResult> OnStep = new();
+	public AsyncEvent<CpuResumeResult> OnResume = new();
 
 	internal Cpu(Ppsspp ppsspp) : base(ppsspp)
 	{
@@ -21,6 +22,7 @@ public sealed class Cpu : Endpoint
 	
 	public async ValueTask<CpuGetReg> GetRegisterAsync(string register)
 	{
+        ArgumentException.ThrowIfNullOrEmpty(register);
 		return await _ppsspp.SendAsync<CpuGetReg>(new ResultMessage
 		{
 			Event = "cpu.getReg",
@@ -29,7 +31,7 @@ public sealed class Cpu : Endpoint
 	}
 
 	public async Task AddBreakpointAsync(uint funcAddress, bool? enabled = null)
-	{
+    {
 		await _ppsspp.SendAsync<MessageEventArgs>(new ResultMessage
 		{
 			Event = "cpu.breakpoint.add",
@@ -45,15 +47,5 @@ public sealed class Cpu : Endpoint
 			Event = "cpu.breakpoint.remove",
 			Address = funcAddress,
 		});
-	}
-
-	public void Resumed(JsonElement root)
-	{
-		OnResume?.Invoke(this, root.Deserialize<CpuResumeResult>() ?? new CpuResumeResult());
-	}
-	
-	public void Stepped(JsonElement root)
-	{
-		OnStep?.Invoke(this, root.Deserialize<CpuSteppingResult>() ?? new CpuSteppingResult());
 	}
 }
