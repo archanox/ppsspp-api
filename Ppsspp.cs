@@ -1,18 +1,19 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.WebSockets;
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ppsspp_api.Endpoints;
 using Websocket.Client;
-
 namespace ppsspp_api;
 
 /// <summary>
 /// 
 /// </summary>
-public sealed class Ppsspp : IAsyncDisposable
+public sealed class Ppsspp : IAsyncDisposable, IDisposable
 {
 	/// <summary>
 	/// Error levels as reported by the debugger
@@ -84,15 +85,16 @@ public sealed class Ppsspp : IAsyncDisposable
 	/// <summary>
 	/// Set this to a function receiving (message, level) for errors.
 	/// </summary>
-	public event EventHandler<ResultMessage>? OnError;
+	public AsyncEvent<ResultMessage>? OnError;
 
 	/// <summary>
 	/// Set this to a function with no parameters called on disconnect.
 	/// </summary>
-	public event EventHandler? OnClose;
+	public AsyncEvent<EventArgs>? OnClose;
 
 	private WebsocketClient? _socket;
-	private readonly Dictionary<string, EventHandler<JsonElement>> _pendingTickets = new();
+	private bool disposedValue;
+	private readonly ConcurrentDictionary<string, AsyncEvent<JsonElement>> _pendingTickets = new();
 
 	private readonly string[] _noResponseEvents = { "cpu.stepping", "cpu.resume" };
 
@@ -185,25 +187,11 @@ public sealed class Ppsspp : IAsyncDisposable
 		return _socket;
 	}
 
-	private async Task DisconnectAsync()
-	{
-		if (_socket == null)
-		{
-			throw new NotConnectedException();
-		}
-
-		FailAllPending("Disconnected from PPSSPP");
-
-		await _socket.Stop(WebSocketCloseStatus.NormalClosure, "Disconnected from PPSSPP");
-		_socket.Dispose();
-		_socket = null;
-
-		OnClose?.Invoke(this, EventArgs.Empty);
-	}
-
-	internal Task<T> SendAsync<T>(ResultMessage data)
+	internal async Task<T> SendAsync<T>(ResultMessage data)
 		where T : MessageEventArgs, new()
 	{
+		ArgumentNullException.ThrowIfNull(data);
+
 		if (_socket == null)
 		{
 			throw new NotConnectedException();
@@ -211,27 +199,37 @@ public sealed class Ppsspp : IAsyncDisposable
 
 		if (_noResponseEvents.Contains(data.Event))
 		{
-			_socket.Send(JsonSerializer.Serialize(data, new JsonSerializerOptions
+			await _socket.SendInstant(JsonSerializer.Serialize(data, new JsonSerializerOptions
 			{
 				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
 			}));
 		}
 
-		var ticket = MakeTicket();
+		var ticket = MakeTicket(_pendingTickets);
 
 		var tcs = new TaskCompletionSource<T>();
 
-		_pendingTickets[ticket] = (_, args) =>
+
+		AddTicket(ticket, tcs);
+
+		data.Ticket = ticket;
+
+		await _socket.SendInstant(JsonSerializer.Serialize(data, new JsonSerializerOptions
+		{
+			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+		}));
+
+
+		return await tcs.Task;
+	}
+
+	private void AddTicket<T>(string ticket, TaskCompletionSource<T> tcs) where T : MessageEventArgs, new()
+	{
+		async Task Callback(object sender, JsonElement args)
 		{
 			if (args.GetProperty("event").GetString() == "error")
 			{
-				tcs.SetException(new Exception(args.GetProperty("message").GetString())
-				{
-					Data =
-					{
-						["ReceivedMessage"] = args.GetRawText(),
-					},
-				});
+				tcs.SetException(new Exception(args.GetProperty("message").GetString()) { Data = { ["ReceivedMessage"] = args.GetRawText() }, Source = sender.ToString()});
 			}
 			else
 			{
@@ -239,103 +237,141 @@ public sealed class Ppsspp : IAsyncDisposable
 				result.Data = args;
 				tcs.SetResult(result);
 			}
-		};
 
-		data.Ticket = ticket;
+			await Task.CompletedTask;
+		}
 
-		_socket.Send(JsonSerializer.Serialize(data, new JsonSerializerOptions
-		{
-			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-		}));
-
-
-		return tcs.Task;
+		_pendingTickets.TryAdd(ticket, new AsyncEvent<JsonElement>(Callback));
 	}
 
 	private void SetupSocket(IWebsocketClient? websocketClient)
 	{
 		websocketClient?.DisconnectionHappened.Subscribe(info =>
 			{
-				OnClose?.Invoke(this, EventArgs.Empty);
+				OnClose?.InvokeAsync(this, EventArgs.Empty).Wait();
 
-				FailAllPending($"PPSSPP disconnected {info.Exception?.Message}");
+				FailAllPendingAsync($"PPSSPP disconnected {info.Exception?.Message}").Wait();
 			}
 		);
 
-		websocketClient?.MessageReceived.Select(message => Observable.FromAsync(async () =>
+		websocketClient?.MessageReceived
+			.Select(x => JsonDocument.Parse(x.Text).RootElement)
+			.Where(x => x.GetProperty("event").GetString() != "error")
+			.Where(x => !x.TryGetProperty("ticket", out _))
+			.Select(root => Observable.FromAsync(async () =>
 			{
-				JsonElement root = new();
 				try
 				{
-					using var doc = JsonDocument.Parse(message.Text);
-					root = doc.RootElement;
-					if (root.GetProperty("event").GetString() == "error")
+					var eventName = root.GetProperty("event").GetString();
+					switch (eventName)
 					{
-						await HandleErrorAsync(root.GetProperty("message").GetString() ?? "Unknown Error", (ErrorLevels)root.GetProperty("level").GetByte());
-					}
-
-					var handled = false;
-					if (root.TryGetProperty("ticket", out var ticket))
-					{
-						if (!string.IsNullOrWhiteSpace(ticket.GetString()) && _pendingTickets.TryGetValue(ticket.GetString()!, out var handler))
-						{
-							_pendingTickets.Remove(ticket.GetString()!);
-
-							handler.Invoke(this, root);
-							handled = true;
-						}
-
-						if (!handled)
-						{
-							await HandleErrorAsync("Received mismatched ticket: " + ticket.GetString(), ErrorLevels.Error);
-						}
-					}
-
-					if (!handled)
-					{
-						var eventName = root.GetProperty("event").GetString();
-						switch (eventName)
-						{
-							case "game.start":
-								Game.Started(root);
-								break;
-							case "game.quit":
-								Game.Quit(root);
-								break;
-							case "game.resume":
-								Game.Resumed(root);
-								break;
-							case "game.pause":
-								Game.Paused(root);
-								break;
-							case "cpu.stepping":
-								Cpu.Stepped(root);
-								break;
-							case "input.buttons":
-								Input.ButtonChanged(root);
-								break;
-							case "input.analog":
-								Input.AnalogChanged(root);
-								break;
-							case "cpu.resume":
-								Cpu.Resumed(root);
-								break;
-							default:
-								await Console.Error.WriteLineAsync($"{eventName} is unsupported");
-								Debug.WriteLine(root.GetRawText());
-								break;
-						}
+						case "game.start":
+							await AddEventResultsAsync(root, Game.OnStarted);
+							break;
+						case "game.quit":
+							await AddEventResultsAsync(root, Game.OnQuit);
+							break;
+						case "game.resume":
+							await AddEventResultsAsync(root, Game.OnResumed);
+							break;
+						case "game.pause":
+							await AddEventResultsAsync(root, Game.OnPaused);
+							break;
+						case "cpu.stepping":
+							await AddEventResultsAsync(root, Cpu.OnStep);
+							break;
+						case "input.buttons":
+							await AddEventResultsAsync(root, Input.OnButtonChange);
+							break;
+						case "input.analog":
+							await AddEventResultsAsync(root, Input.OnAnalogChange);
+							break;
+						case "cpu.resume":
+							await AddEventResultsAsync(root, Cpu.OnResume);
+							break;
+						case "log":
+							break;
+						default:
+							await Console.Error.WriteLineAsync($"{eventName} is unsupported");
+							Debug.WriteLine(root.GetRawText());
+							break;
 					}
 				}
 				catch (Exception ex)
 				{
 					await HandleErrorAsync($"Failed to parse message from PPSSPP: {ex.Message}", ErrorLevels.Error);
 
-					Debug.WriteLine(root.GetRawText());
-					throw;
+					ex.Data["ReceivedMessage"] = root.GetRawText();
+
+					await Console.Error.WriteLineAsync(root.GetRawText());
+					//throw;
 				}
 			}))
-			.Merge()
+			//.Merge()
+			.Concat()
+			.ObserveOn(TaskPoolScheduler.Default)
+			.Subscribe();
+
+		websocketClient?.MessageReceived
+			.Select(x => JsonDocument.Parse(x.Text).RootElement)
+			.Where(x=>x.GetProperty("event").GetString() != "error")
+			.Where(x => x.TryGetProperty("ticket", out _))
+			.Select(root => Observable.FromAsync(async () =>
+			{
+				try
+				{
+					var handled = false;
+					var ticket = root.GetProperty("ticket").GetString();
+
+					if (!string.IsNullOrWhiteSpace(ticket) && _pendingTickets.TryRemove(ticket, out var handler))
+					{
+						await handler.InvokeAsync(this, root);
+						
+						handled = true;
+					}
+
+					if (!handled)
+					{
+						await HandleErrorAsync("Received mismatched ticket: " + ticket, ErrorLevels.Error);
+					}
+				}
+				catch (Exception ex)
+				{
+					await HandleErrorAsync($"Failed to parse ticket from PPSSPP: {ex.Message}", ErrorLevels.Error);
+
+					ex.Data["ReceivedMessage"] = root.GetRawText();
+
+					await Console.Error.WriteLineAsync(root.GetRawText());
+					//throw;
+				}
+			}))
+			.Concat()
+			//.Merge()
+			.ObserveOn(TaskPoolScheduler.Default)
+			.Subscribe();
+
+		websocketClient?.MessageReceived
+			.Select(x => JsonDocument.Parse(x.Text).RootElement)
+			.Where(x => x.GetProperty("event").GetString() == "error")
+			.Select(message => Observable.FromAsync(async () =>
+		{
+			try
+			{
+				await HandleErrorAsync(message.GetProperty("message").GetString() ?? "Unknown Error", (ErrorLevels)message.GetProperty("level").GetByte());
+			}
+			catch (Exception ex)
+			{
+				await HandleErrorAsync($"Failed to parse error from PPSSPP: {ex.Message}", ErrorLevels.Error);
+
+				ex.Data["ReceivedMessage"] = message.GetRawText();
+
+				await Console.Error.WriteLineAsync(message.GetRawText());
+				//throw;
+			}
+		}))
+			.Concat()
+			//.Merge()
+			.ObserveOn(TaskPoolScheduler.Default)
 			.Subscribe();
 	}
 
@@ -361,6 +397,7 @@ public sealed class Ppsspp : IAsyncDisposable
 
 			if (socket.IsRunning)
 			{
+				Debug.WriteLine(endpoint);
 				return socket;
 			}
 
@@ -380,11 +417,11 @@ public sealed class Ppsspp : IAsyncDisposable
 	{
 		if (OnError != null && OnError.GetInvocationList().Any())
 		{
-			OnError?.Invoke(this, new ResultMessage
+			await (OnError?.InvokeAsync(this, new ResultMessage
 			{
 				Message = message,
 				Level = level,
-			});
+			}) ?? Task.CompletedTask);
 		}
 		else if (level is ErrorLevels.Unknown or ErrorLevels.Error)
 		{
@@ -396,18 +433,19 @@ public sealed class Ppsspp : IAsyncDisposable
 		}
 	}
 
-	private string MakeTicket()
+	private static readonly ThreadLocal<Random> Random = new (() => new Random());
+
+	private static string MakeTicket(IReadOnlyDictionary<string, AsyncEvent<JsonElement>> pendingTickets)
 	{
 		const string chars = "0123456789abcdefghijklmnopqrstuvwxyz";
-		var random = new Random();
-
+		
 		while (true)
 		{
 			var ticket = new string(Enumerable.Repeat(chars, 11)
-				.Select(s => s[random.Next(s.Length)])
+				.Select(s => s[Random.Value!.Next(s.Length)])
 				.ToArray());
 
-			if (_pendingTickets.ContainsKey(ticket))
+			if (pendingTickets.ContainsKey(ticket))
 			{
 				continue;
 			}
@@ -416,29 +454,73 @@ public sealed class Ppsspp : IAsyncDisposable
 		}
 	}
 
-	private void FailAllPending(string message)
+	private async Task FailAllPendingAsync(string message)
 	{
 		var data = new ResultMessage { Event = "error", Message = message, Level = ErrorLevels.Error };
 
 		foreach (var pendingTicket in _pendingTickets.ToArray())
 		{
-			_pendingTickets[pendingTicket.Key].Invoke(this, JsonSerializer.SerializeToElement(data));
+			await _pendingTickets[pendingTicket.Key].InvokeAsync(this, JsonSerializer.SerializeToElement(data));
 		}
 
 		_pendingTickets.Clear();
 	}
 
 	/// <summary>
-	/// Once this object is disposed the connection is cleaned up with events triggered
+	/// Once this object is disposed asynchronously the connection is cleaned up with events triggered
 	/// </summary>
 	public async ValueTask DisposeAsync()
 	{
 		if (_socket != null && (_socket.IsStarted || _socket.IsRunning))
 		{
-			await DisconnectAsync();
+			await _socket.StopOrFail(WebSocketCloseStatus.NormalClosure, "Disconnected from PPSSPP");
 		}
+		await FailAllPendingAsync("Disconnected from PPSSPP");
+		if (!disposedValue)
+		{
+			// TODO: dispose managed state (managed objects)
+			_socket?.Dispose();
 
-		GC.SuppressFinalize(this);
+			// TODO: free unmanaged resources (unmanaged objects) and override finalizer
+			// TODO: set large fields to null
+			_socket = null;
+			disposedValue = true;
+		}
+		await (OnClose?.InvokeAsync(this, EventArgs.Empty) ?? Task.CompletedTask);
+		//GC.SuppressFinalize(this);
+	}
+
+
+
+	/// <summary>
+	/// Once this object is disposed the connection is cleaned up with events triggered
+	/// </summary>
+	public void Dispose()
+	{
+		if (_socket != null && (_socket.IsStarted || _socket.IsRunning))
+		{
+			_socket.StopOrFail(WebSocketCloseStatus.NormalClosure, "Disconnected from PPSSPP").RunSynchronously();
+		}
+		FailAllPendingAsync("Disconnected from PPSSPP").RunSynchronously();
+		if (!disposedValue)
+		{
+			// TODO: dispose managed state (managed objects)
+			_socket?.Dispose();
+
+			// TODO: free unmanaged resources (unmanaged objects) and override finalizer
+			// TODO: set large fields to null
+			_socket = null;
+			disposedValue = true;
+		}
+		OnClose?.InvokeAsync(this, EventArgs.Empty).RunSynchronously();
+		//GC.SuppressFinalize(this);
+	}
+
+	internal async Task AddEventResultsAsync<TMessageEvent>(JsonElement root, AsyncEvent<TMessageEvent> asyncEvent)
+		where TMessageEvent : MessageEventArgs, new()
+	{
+		if(asyncEvent.GetInvocationList().Any())
+			await (asyncEvent?.InvokeAsync(this, root.Deserialize<TMessageEvent>() ?? new TMessageEvent()) ?? Task.CompletedTask);
 	}
 }
 
@@ -537,3 +619,75 @@ public class AlreadyConnectedException : Exception
 }
 
 
+public class AsyncEvent<TEventArgs> //where TEventArgs : EventArgs
+{
+	private readonly List<Func<object, TEventArgs, Task>> _invocationList;
+	private readonly object _locker;
+
+	public AsyncEvent()
+	{
+		_invocationList = new List<Func<object, TEventArgs, Task>>();
+		_locker = new object();
+	}
+
+	public AsyncEvent(Func<object, TEventArgs, Task> invocationList)
+	{
+		_invocationList = new List<Func<object, TEventArgs, Task>>() { invocationList };
+		_locker = new object();
+	}
+
+	public void Add(Func<object, TEventArgs, Task> callback)
+	{
+		ArgumentNullException.ThrowIfNull(callback);
+
+		lock (this._locker)
+		{
+			this._invocationList.Add(callback);
+		}
+	}
+
+	public void Remove(Func<object, TEventArgs, Task> callback)
+	{
+		ArgumentNullException.ThrowIfNull(callback);
+
+		lock (this._locker)
+		{
+			this._invocationList.Remove(callback);
+		}
+	}
+
+	public async Task InvokeAsync(object sender, TEventArgs eventArgs)
+	{
+		List<Func<object, TEventArgs, Task>> tmpInvocationList;
+		lock (_locker)
+		{
+			tmpInvocationList = new List<Func<object, TEventArgs, Task>>(_invocationList);
+		}
+
+		foreach (var callback in tmpInvocationList)
+		{
+			//Assuming we want a serial invocation, for a parallel invocation we can use Task.WhenAll instead
+			await callback(sender, eventArgs);
+		}
+	}
+
+	internal List<Func<object, TEventArgs, Task>> GetInvocationList()
+	{
+		lock (_locker)
+		{
+			return _invocationList;
+		}
+	}
+}
+
+
+
+public class LogResult
+{
+	public string _event { get; set; }
+	public string timestamp { get; set; }
+	public string header { get; set; }
+	public string message { get; set; }
+	public Ppsspp.ErrorLevels level { get; set; }
+	public string channel { get; set; }
+}

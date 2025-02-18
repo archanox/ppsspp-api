@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace ppsspp_api;
 
-public class GameResultEventArgs : EventArgs
+public class GameResultEventArgs : MessageEventArgs
 {
 	[JsonPropertyName("title")]
 	public string Title { get; set; }
@@ -159,10 +159,10 @@ public class InputAnalogResult : MessageEventArgs
 	public string Stick { get; set; }
 	
 	[JsonPropertyName("x")]
-	public int X { get; set; }
+	public double X { get; set; }
 	
 	[JsonPropertyName("y")]
-	public int Y { get; set; }
+	public double Y { get; set; }
 }
 
 
